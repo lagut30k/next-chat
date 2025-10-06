@@ -1,10 +1,9 @@
 // 'use client';
-import { Suspense, use } from 'react';
-import {
-  SocketComponent,
-  WakeLock,
-} from '@/app/rooms/[roomId]/socketComponent';
+import { Suspense } from 'react';
+import { SocketComponent, WakeLock } from '@/components/socketComponent';
 import { delay } from '@/app/utils/delay';
+
+import { Room } from '@/components/room';
 // import { useParams, useSearchParams } from 'next/navigation';
 
 export default async function RoomPage({
@@ -19,9 +18,8 @@ export default async function RoomPage({
   const t = delay(5000).then(() => roomId);
   return (
     <div>
-      <h1>Room: {roomId} aa</h1>
       <Suspense key={roomId} fallback="Loading... (room page)">
-        <SocketComponent roomId={roomId} id={t} />
+        <Room roomId={roomId} id={t} />
         <WakeLock />
       </Suspense>
     </div>

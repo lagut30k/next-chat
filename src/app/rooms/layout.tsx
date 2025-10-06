@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { sharedState } from '@/lib/sharedState';
+import { sharedState } from '@/socketLib/sharedState';
 
 export default function RoomsLayout({
   children,
@@ -15,9 +15,6 @@ export default function RoomsLayout({
         </Suspense>
       </menu>
       <main className="flex-1 min-w-0 p-4">
-        {sharedState.seed.map((s, i) => (
-          <div key={i}>{s}</div>
-        ))}
         <Suspense fallback={<div>Loading (room layout)...</div>}>
           {children}
         </Suspense>

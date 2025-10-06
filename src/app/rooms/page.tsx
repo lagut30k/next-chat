@@ -1,4 +1,4 @@
-import { seed } from '@/lib/testIsolation';
+import { seed } from '@/socketLib/testIsolation';
 
 export default async function LobbyPage() {
   'use server';

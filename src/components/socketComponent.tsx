@@ -28,7 +28,7 @@ export const SocketComponent = ({
   id: Promise<string>;
 }) => {
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:3000/api/rooms/${roomId}/chat`);
+    const ws = new WebSocket(`ws://localhost:3000/ws/rooms/${roomId}`);
     ws.onopen = () => {
       console.log('Connected to WebSocket');
       ws.send('Hello, WebSocket!');
@@ -36,10 +36,14 @@ export const SocketComponent = ({
     ws.onmessage = (event) => {
       console.log('Message received:', event.data);
     };
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
+    ws.onerror = (event) => {
+      console.error('WebSocket error:', event);
+    };
+    ws.onclose = (event) => {
+      console.log('WebSocket connection closed', event);
     };
     return () => {
+      console.log('Cleaning up WebSocket connection');
       ws.close();
     };
   }, [roomId]);
