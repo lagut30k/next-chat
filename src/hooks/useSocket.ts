@@ -1,76 +1,72 @@
-import {
-  Suspense,
-  use,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { writer } from 'node:repl';
-import { OPEN } from 'ws';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { AsyncQueue } from '@/utils/asyncQueue';
 
-let i = 1;
-export function useSocket({
-  roomId,
-  id,
-}: {
-  roomId: string;
-  id: Promise<string>;
-}) {
-  const transformStream = useMemo(() => {
-    const t = new TransformStream({});
-    // @ts-expect-error debug
-    t.x = i;
-    console.log('init transform stream', i);
-    i++;
-    return t;
-  }, []);
-  const writerRef = useRef<WritableStreamDefaultWriter>(null);
+let j = 1;
+
+export function useSocket(url: string) {
+  const writerRef = useRef<WritableStreamDefaultWriter<string> | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
   useEffect(() => {
-    console.log(
-      'transformStream.readable === transformStream.readable',
-      transformStream.readable === transformStream.readable,
-    );
+    console.log('creating WebSocket', j++);
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+    const queue = new AsyncQueue<string>();
+    ws.onopen = () => {};
+    ws.onmessage = (event) => {
+      const messageData = event.data;
+      if (event.data instanceof Blob) {
+        queue.enqueue(async () => {
+          const blob = event.data;
+          const buffer = await blob.arrayBuffer();
+          return new TextDecoder().decode(buffer);
+        });
+      } else if (event.data instanceof ArrayBuffer) {
+        queue.enqueue(new TextDecoder().decode(event.data));
+      } else if (typeof event.data === 'string') {
+        queue.enqueue(messageData);
+      }
+    };
+    async function processQueue() {
+      for await (const message of queue) {
+        void writerRef.current?.write(message);
+      }
+    }
+    void processQueue();
+    ws.onerror = (event) => {
+      console.error('WebSocket error:', event);
+    };
+    ws.onclose = (event) => {
+      console.log('WebSocket connection closed', url, event);
+    };
+    return () => {
+      console.log('Cleaning up WebSocket connection', url);
+      function close() {
+        ws.close(1000, 'Cleaning up WebSocket connection');
+      }
+      switch (ws.readyState) {
+        case WebSocket.OPEN:
+          close();
+          break;
+        case WebSocket.CONNECTING:
+          ws.onopen = close;
+          break;
+        case WebSocket.CLOSING:
+        case WebSocket.CLOSED:
+        default:
+          break;
+      }
+    };
+  }, [url]);
+
+  const transformStream = useMemo(() => new TransformStream<unknown>({}), []);
+  useEffect(() => {
     const writer = transformStream.writable.getWriter();
     writerRef.current = writer;
     return () => {
       writer.releaseLock();
     };
   }, [transformStream]);
-  const writer1 = writerRef.current!;
-
-  const wsRef = useRef<WebSocket>(null);
-  useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:3000/ws/rooms/${roomId}`);
-    wsRef.current = ws;
-    ws.onopen = () => {
-      console.log('Connected to WebSocket');
-      ws.send('Hello, WebSocket!');
-    };
-    ws.onmessage = (event) => {
-      console.log('Message received:', event.data);
-      void writerRef.current!.write(event.data);
-    };
-    ws.onerror = (event) => {
-      console.error('WebSocket error:', event);
-
-      console.error(event);
-    };
-    ws.onclose = (event) => {
-      console.log('WebSocket connection closed', event);
-    };
-    return () => {
-      console.log('Cleaning up WebSocket connection');
-
-      if (ws.readyState === ws.OPEN) {
-        ws.close(1000, 'Cleaning up WebSocket connection');
-      }
-      if (ws.readyState === ws.CONNECTING) {
-        ws.onopen = () => ws.close(1000, 'Cleaning up WebSocket connection');
-      }
-    };
-  }, [roomId]);
 
   const sendMessage = useCallback((message: string) => {
     wsRef.current?.send(message);

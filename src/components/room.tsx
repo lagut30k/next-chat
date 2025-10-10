@@ -1,20 +1,17 @@
 'use client';
 import { useSocket } from '@/hooks/useSocket';
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { release } from 'node:os';
-import { delay } from '@/app/utils/delay';
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
-export function Room({ roomId, id }: { roomId: string; id: Promise<string> }) {
-  const { sendMessage, messageStream } = useSocket({
-    roomId,
-    id,
-  });
-  const messageStreamRef = useRef(messageStream);
-  useEffect(() => {
-    console.log('setting message stream');
-    messageStreamRef.current = messageStream;
-  }, [messageStream]);
-  const getMessageStream = () => messageStreamRef.current;
+export function Room({ roomId }: { roomId: string }) {
+  const url = useMemo(() => `ws://localhost:3000/ws/rooms/${roomId}`, [roomId]);
+  const { sendMessage, messageStream } = useSocket(url);
   const [messages, setMessages] = useState<string[]>([]);
 
   const submit = useCallback(
@@ -26,44 +23,47 @@ export function Room({ roomId, id }: { roomId: string; id: Promise<string> }) {
   );
 
   useEffect(() => {
-    console.log('getting reader for ', messageStream);
-    if (messageStream.locked) {
-      return;
-    }
+    console.log('message stream updated, re-subscribing');
+    if (!messageStream) return () => {};
+
     const reader = messageStream.getReader();
+    let canceled = false;
 
-    let stopped = false;
-
-    const read = async () => {
-      while (!stopped) {
-        const { done, value } = await reader.read();
-        if (done) {
-          console.log('done');
-          break;
+    async function read() {
+      try {
+        while (!canceled) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('done');
+            break;
+          }
+          setMessages((messages) => [...messages, value]);
         }
-        setMessages((messages) => [...messages, value]);
+      } catch (e) {
+        if (!canceled) {
+          console.error('Error on reading message stream', e);
+          throw e;
+        }
+      } finally {
+        if (!canceled) {
+          reader.releaseLock();
+        }
       }
-    };
-
+    }
     void read();
 
     return () => {
-      if (getMessageStream() === messageStream) {
-        return;
-      }
-      stopped = true;
-      try {
-        // reader.closed.catch((e) => {
-        //   console.log('reader closed with error', e);
-        // });
-
-        reader.releaseLock();
-      } catch (e) {
-        // silently ignore
-        console.log('reader releaseLock error', e);
-      }
+      canceled = true;
+      reader.releaseLock();
     };
   }, [messageStream]);
+
+  useEffect(() => {
+    console.log('Room mounted', roomId);
+    return () => {
+      console.log('Room unmounted', roomId);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto w-full">
@@ -79,6 +79,7 @@ export function Room({ roomId, id }: { roomId: string; id: Promise<string> }) {
       <form action={submit} className="flex gap-2" autoComplete="off">
         <input
           name="text"
+          autoFocus
           className="flex-1 px-4 py-2 border border-gray-600 rounded-md bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         <button

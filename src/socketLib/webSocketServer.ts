@@ -37,9 +37,11 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
   console.log('path:', path);
   addSocket(path, ws);
 
-  ws.send('Hello, client!');
-
   const pingInterval = setInterval(() => ws.ping(), 10_000);
+  ws.send('1Hello, client!', { binary: true });
+  ws.send('2Hello, client!', { binary: true });
+  ws.send('3Hello, client!', { binary: true });
+  ws.send('4Hello, client!');
   ws.send(JSON.stringify(sharedState.seed), { binary: false });
 
   ws.on('message', (message: Buffer, isBinary: boolean) => {

@@ -6,10 +6,10 @@ export const WakeLock = () => {
   useEffect(() => {
     const lock = navigator.wakeLock.request('screen');
     lock.then((l) => {
-      console.log('WakeLock acquired');
+      console.debug('WakeLock acquired');
       setIsLocked(true);
       l.addEventListener('release', (e) => {
-        console.log('WakeLock released', e);
+        console.debug('WakeLock released', e);
         setIsLocked(false);
       });
     });
