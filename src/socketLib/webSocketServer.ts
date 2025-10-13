@@ -1,5 +1,4 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import { sharedState } from '@/socketLib/sharedState';
+import { WebSocket as WsWebSocket, WebSocketServer } from 'ws';
 import * as http from 'node:http';
 import { clearInterval } from 'node:timers';
 import { generateUuid } from '@/utils/generateUuid';
@@ -7,7 +6,22 @@ import {
   ChatMessage,
   ChatMessageJsonCodec,
   ClientToServerChatMessageJsonCodec,
+  UserAuthenticationDataJsonCodec,
+  UserPublicData,
 } from '@/dto/ChatMessage';
+import { use } from 'react';
+
+type Authenticated = {
+  isAuthenticated: true;
+  user: UserPublicData;
+};
+type NonAuthenticated = {
+  isAuthenticated: false;
+};
+
+type WebSocket = WsWebSocket & {
+  authentication: Authenticated | NonAuthenticated;
+};
 
 const wss = new WebSocketServer({ noServer: true });
 const connectedSockets = new Map<string, Set<WebSocket>>();
@@ -34,7 +48,21 @@ function getSockets(path: string) {
   return connectedSockets.get(path) ?? new Set<WebSocket>();
 }
 
+function extractUserFromRequest(request: http.IncomingMessage): UserPublicData {
+  const id = generateUuid();
+  const nickName = `User-${id}`;
+  return {
+    id,
+    nickName,
+  };
+}
+
+const serverId = generateUuid();
+
 wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
+  ws.authentication = {
+    isAuthenticated: false,
+  };
   console.log('New client connected');
   console.log('request.url', request.url);
   const url = URL.parse(request.url ?? '', 'http://fake.domain/');
@@ -50,21 +78,19 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
     return sendChatMessage({
       id: generateUuid(),
       content: message,
-      author: 'Server',
+      author: {
+        id: serverId,
+        nickName: 'Server',
+      },
     });
   }
   const pingInterval = setInterval(() => ws.ping(), 10_000);
-  sendChatServerMessage('1Hello, client!');
-  sendChatServerMessage('2Hello, client!');
-  sendChatServerMessage('3Hello, client!');
-  sendChatServerMessage('4Hello, client!');
-  sendChatServerMessage('5Hello, client!');
+  sendChatServerMessage('Hello! Please authenticate');
 
-  ws.on('message', (message: Buffer, isBinary: boolean) => {
-    console.log(`Message received: ${message}`);
-    if (isBinary) {
-      return;
-    }
+  function broadcastMessage(
+    message: Buffer<ArrayBufferLike>,
+    user: UserPublicData,
+  ) {
     const incomingMessageParseResult =
       ClientToServerChatMessageJsonCodec.safeParse(message.toString());
     if (!incomingMessageParseResult.success) {
@@ -74,17 +100,51 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
     const chatMessage: ChatMessage = {
       id: generateUuid(),
       content: incomingMessage.content,
-      author: 'Client',
+      author: user,
     };
+
     const serialisedChatMessage = ChatMessageJsonCodec.encode(chatMessage);
     getSockets(path).forEach((client) => {
       if (
         client.readyState === WebSocket.OPEN &&
-        message.toString() !== `{"event":"ping"}`
+        message.toString() !== `{"event":"ping"}` &&
+        client.authentication.isAuthenticated
       ) {
         client.send(serialisedChatMessage);
       }
     });
+  }
+
+  function authenticate(message: Buffer, ws: WebSocket) {
+    const parseResult = UserAuthenticationDataJsonCodec.safeParse(
+      message.toString(),
+    );
+    if (!parseResult.success) {
+      return;
+    }
+    const userData = parseResult.data;
+    ws.authentication = {
+      isAuthenticated: true,
+      user: {
+        id: userData.userId,
+        nickName: userData.nickName,
+      },
+    };
+    sendChatServerMessage(
+      `Thank you for authenticating, ${userData.nickName}!`,
+    );
+  }
+
+  ws.on('message', (message: Buffer, isBinary: boolean) => {
+    console.log(`Message received: ${message}`);
+    if (isBinary) {
+      return;
+    }
+    if (!ws.authentication.isAuthenticated) {
+      authenticate(message, ws);
+    } else {
+      broadcastMessage(message, ws.authentication.user);
+    }
   });
 
   ws.on('close', (event) => {

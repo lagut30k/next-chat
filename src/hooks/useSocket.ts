@@ -1,3 +1,4 @@
+'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AsyncQueue } from '@/utils/asyncQueue';
 import { useStreamToEventBus } from '@/hooks/useStreamToEventBus';
@@ -7,20 +8,33 @@ import {
   ChatMessageJsonCodec,
   ClientToServerChatMessage,
   ClientToServerChatMessageJsonCodec,
+  UserAuthenticationDataJsonCodec,
 } from '@/dto/ChatMessage';
+import useStore from '@/store/useStore';
+import { useUserIdStore } from '@/store/user';
 
 let j = 1;
 
-export function useSocket(url: string) {
+export function useSocket(url: string, userId: string) {
   const writerRef = useRef<WritableStreamDefaultWriter<string> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     console.log('creating WebSocket', j++);
+    const authenticate = () => {
+      console.log('Authenticating', userId);
+      const serialized = UserAuthenticationDataJsonCodec.encode({
+        userId: userId,
+        nickName: `User-${userId}`,
+      });
+      ws.send(serialized);
+    };
     const ws = new WebSocket(url);
     wsRef.current = ws;
     const queue = new AsyncQueue<string>();
-    ws.onopen = () => {};
+    ws.onopen = () => {
+      authenticate();
+    };
     ws.onmessage = (event) => {
       const messageData = event.data;
       if (event.data instanceof Blob) {
@@ -65,7 +79,7 @@ export function useSocket(url: string) {
           break;
       }
     };
-  }, [url]);
+  }, [url, userId]);
 
   const transformStream = useMemo(
     () => new TransformStream<unknown, string>({}),
@@ -91,8 +105,10 @@ export function useSocket(url: string) {
 }
 
 export function useRoomChatMessages(roomId: string) {
+  const userId = useStore(useUserIdStore, (state) => state.userId);
   const { sendMessage, messageStream } = useSocket(
     `ws://localhost:3000/ws/rooms/${roomId}`,
+    userId,
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const eventBus = useStreamToEventBus(messageStream);
@@ -104,14 +120,6 @@ export function useRoomChatMessages(roomId: string) {
         setMessages((messages) => [...messages, parseResult.data]);
       } else {
         console.error('Invalid message:', parseResult.error);
-        setMessages((messages) => [
-          ...messages,
-          {
-            author: 'Unknown',
-            content: message,
-            id: generateUuid(),
-          },
-        ]);
       }
     });
   }, [eventBus]);
