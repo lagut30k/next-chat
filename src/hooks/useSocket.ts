@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AsyncQueue } from '@/utils/asyncQueue';
 import { useStreamToEventBus } from '@/hooks/useStreamToEventBus';
-import { generateUuid } from '@/utils/generateUuid';
 import {
   ChatMessage,
   ChatMessageJsonCodec,
@@ -13,71 +12,88 @@ import {
 import useStore from '@/store/useStore';
 import { useUserIdStore } from '@/store/user';
 
-let j = 1;
-
-export function useSocket(url: string, userId: string) {
+export function useSocket(url: string, userId?: string) {
   const writerRef = useRef<WritableStreamDefaultWriter<string> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    console.log('creating WebSocket', j++);
+    if (!userId) return () => {};
+    if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+    const queue = new AsyncQueue<string>();
+
     const authenticate = () => {
-      console.log('Authenticating', userId);
+      console.log('Authenticating', userId, typeof userId);
       const serialized = UserAuthenticationDataJsonCodec.encode({
         userId: userId,
         nickName: `User-${userId}`,
       });
-      ws.send(serialized);
+      reconnectableWs.send(serialized);
     };
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-    const queue = new AsyncQueue<string>();
-    ws.onopen = () => {
-      authenticate();
-    };
-    ws.onmessage = (event) => {
-      const messageData = event.data;
-      if (event.data instanceof Blob) {
-        queue.enqueue(async () => {
-          const blob = event.data;
-          const buffer = await blob.arrayBuffer();
-          return new TextDecoder().decode(buffer);
-        });
-      } else if (event.data instanceof ArrayBuffer) {
-        queue.enqueue(new TextDecoder().decode(event.data));
-      } else if (typeof event.data === 'string') {
-        queue.enqueue(messageData);
+
+    function createWs() {
+      console.log('Creating WebSocket', url, userId);
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      ws.onopen = () => {
+        authenticate();
+      };
+      ws.onmessage = (event) => {
+        const messageData = event.data;
+        if (event.data instanceof Blob) {
+          queue.enqueue(async () => {
+            const blob = event.data;
+            const buffer = await blob.arrayBuffer();
+            return new TextDecoder().decode(buffer);
+          });
+        } else if (event.data instanceof ArrayBuffer) {
+          queue.enqueue(new TextDecoder().decode(event.data));
+        } else if (typeof event.data === 'string') {
+          queue.enqueue(messageData);
+        }
+      };
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
+      };
+      ws.addEventListener('close', reconnect);
+      return ws;
+    }
+
+    function reconnect(event: CloseEvent) {
+      console.log('WebSocket connection closed', url, event);
+      if (!event.wasClean) {
+        reconnectTimeout.current = setTimeout(() => {
+          console.log('Reconnecting...');
+          reconnectableWs = createWs();
+        }, 1000);
       }
-    };
+    }
+    let reconnectableWs = createWs();
+
     async function processQueue() {
       for await (const message of queue) {
         void writerRef.current?.write(message);
       }
     }
     void processQueue();
-    ws.onerror = (event) => {
-      console.error('WebSocket error:', event);
-    };
-    ws.onclose = (event) => {
-      console.log('WebSocket connection closed', url, event);
-    };
     return () => {
-      console.log('Cleaning up WebSocket connection', url);
+      console.log('Cleaning up WebSocket connection', url, userId);
       function close() {
-        ws.close(1000, 'Cleaning up WebSocket connection');
+        reconnectableWs.close(1000, 'Cleaning up WebSocket connection');
       }
-      switch (ws.readyState) {
+      switch (reconnectableWs.readyState) {
         case WebSocket.OPEN:
           close();
           break;
         case WebSocket.CONNECTING:
-          ws.onopen = close;
+          reconnectableWs.onopen = close;
           break;
         case WebSocket.CLOSING:
         case WebSocket.CLOSED:
         default:
           break;
       }
+      reconnectableWs.removeEventListener('close', reconnect);
     };
   }, [url, userId]);
 

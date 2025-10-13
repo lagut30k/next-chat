@@ -2,7 +2,6 @@ import next from 'next';
 import { parse } from 'url';
 import { createServer, IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
-import { sharedState } from '@/socketLib/sharedState';
 import wss from '@/socketLib/webSocketServer';
 
 const port = parseInt(process.env.PORT || '3000', 10);

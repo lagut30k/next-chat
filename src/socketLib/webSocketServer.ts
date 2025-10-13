@@ -9,7 +9,6 @@ import {
   UserAuthenticationDataJsonCodec,
   UserPublicData,
 } from '@/dto/ChatMessage';
-import { use } from 'react';
 
 type Authenticated = {
   isAuthenticated: true;
@@ -46,15 +45,6 @@ function removeSocket(path: string, ws: WebSocket) {
 
 function getSockets(path: string) {
   return connectedSockets.get(path) ?? new Set<WebSocket>();
-}
-
-function extractUserFromRequest(request: http.IncomingMessage): UserPublicData {
-  const id = generateUuid();
-  const nickName = `User-${id}`;
-  return {
-    id,
-    nickName,
-  };
 }
 
 const serverId = generateUuid();

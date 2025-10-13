@@ -11,7 +11,7 @@ export interface UserIdStore {
 export const useUserIdStore = create<UserIdStore>()(
   persist(
     (set) => ({
-      userId: '',
+      userId: 'aa',
       setUser: (userId) => set({ userId }),
     }),
     {

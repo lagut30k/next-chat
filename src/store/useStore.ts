@@ -11,6 +11,6 @@ const useStore = <T, F>(
     setData(result);
   }, [result]);
 
-  return data as F;
+  return data;
 };
 export default useStore;

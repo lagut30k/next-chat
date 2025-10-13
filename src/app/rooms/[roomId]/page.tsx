@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { delay } from '@/utils/delay';
 
 import { Room } from '@/components/room';
-import { WakeLock } from '@/components/socketComponent';
+import { WakeLock } from '@/components/wakeLock';
 // import { useParams, useSearchParams } from 'next/navigation';
 
 export default async function RoomPage({
