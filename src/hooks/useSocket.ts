@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AsyncQueue } from '@/utils/asyncQueue';
+import { useStreamToEventBus } from '@/hooks/useStreamToEventBus';
+import { generateUuid } from '@/utils/generateUuid';
+import { ChatMessage, ChatMessageJsonCodec } from '@/dto/ChatMessage';
 
 let j = 1;
 
@@ -59,7 +62,10 @@ export function useSocket(url: string) {
     };
   }, [url]);
 
-  const transformStream = useMemo(() => new TransformStream<unknown>({}), []);
+  const transformStream = useMemo(
+    () => new TransformStream<unknown, string>({}),
+    [],
+  );
   useEffect(() => {
     const writer = transformStream.writable.getWriter();
     writerRef.current = writer;
@@ -75,5 +81,36 @@ export function useSocket(url: string) {
   return {
     sendMessage,
     messageStream: transformStream.readable,
+  };
+}
+
+export function useRoomChatMessages(roomId: string) {
+  const { sendMessage, messageStream } = useSocket(
+    `ws://localhost:3000/ws/rooms/${roomId}`,
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const eventBus = useStreamToEventBus(messageStream);
+  useEffect(() => {
+    return eventBus.subscribe((message) => {
+      console.log('message received', message);
+      const parseResult = ChatMessageJsonCodec.safeParse(message);
+      if (parseResult.success) {
+        setMessages((messages) => [...messages, parseResult.data]);
+      } else {
+        console.error('Invalid message:', parseResult.error);
+        setMessages((messages) => [
+          ...messages,
+          {
+            author: 'Unknown',
+            content: message,
+            id: generateUuid(),
+          },
+        ]);
+      }
+    });
+  }, [eventBus]);
+  return {
+    messages,
+    sendMessage,
   };
 }

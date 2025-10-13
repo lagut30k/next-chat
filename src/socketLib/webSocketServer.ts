@@ -2,6 +2,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { sharedState } from '@/socketLib/sharedState';
 import * as http from 'node:http';
 import { clearInterval } from 'node:timers';
+import { generateUuid } from '@/utils/generateUuid';
+import { ChatMessage, ChatMessageJsonCodec } from '@/dto/ChatMessage';
 
 const wss = new WebSocketServer({ noServer: true });
 const connectedSockets = new Map<string, Set<WebSocket>>();
@@ -37,12 +39,24 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
   console.log('path:', path);
   addSocket(path, ws);
 
+  function sendChatMessage(message: ChatMessage) {
+    ws.send(ChatMessageJsonCodec.encode(message));
+  }
+  function sendChatServerMessage(message: string) {
+    return sendChatMessage({
+      id: generateUuid(),
+      content: message,
+      author: 'Server',
+    });
+  }
   const pingInterval = setInterval(() => ws.ping(), 10_000);
-  ws.send('1Hello, client!', { binary: true });
-  ws.send('2Hello, client!', { binary: true });
-  ws.send('3Hello, client!', { binary: true });
-  ws.send('4Hello, client!');
-  ws.send(JSON.stringify(sharedState.seed), { binary: false });
+  sendChatServerMessage('1Hello, client!');
+  sendChatServerMessage('2Hello, client!');
+  sendChatServerMessage('3Hello, client!');
+  sendChatServerMessage('4Hello, client!');
+  sendChatServerMessage('5Hello, client!');
+
+  // ws.send(JSON.stringify(sharedState.seed), { binary: false });
 
   ws.on('message', (message: Buffer, isBinary: boolean) => {
     console.log(`Message received: ${message}`);

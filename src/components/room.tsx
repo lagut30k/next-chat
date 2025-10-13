@@ -1,18 +1,9 @@
 'use client';
-import { useSocket } from '@/hooks/useSocket';
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useRoomChatMessages } from '@/hooks/useSocket';
+import { useCallback } from 'react';
 
 export function Room({ roomId }: { roomId: string }) {
-  const url = useMemo(() => `ws://localhost:3000/ws/rooms/${roomId}`, [roomId]);
-  const { sendMessage, messageStream } = useSocket(url);
-  const [messages, setMessages] = useState<string[]>([]);
+  const { sendMessage, messages } = useRoomChatMessages(roomId);
 
   const submit = useCallback(
     (formData: FormData) => {
@@ -22,49 +13,6 @@ export function Room({ roomId }: { roomId: string }) {
     [sendMessage],
   );
 
-  useEffect(() => {
-    console.log('message stream updated, re-subscribing');
-    if (!messageStream) return () => {};
-
-    const reader = messageStream.getReader();
-    let canceled = false;
-
-    async function read() {
-      try {
-        while (!canceled) {
-          const { done, value } = await reader.read();
-          if (done) {
-            console.log('done');
-            break;
-          }
-          setMessages((messages) => [...messages, value]);
-        }
-      } catch (e) {
-        if (!canceled) {
-          console.error('Error on reading message stream', e);
-          throw e;
-        }
-      } finally {
-        if (!canceled) {
-          reader.releaseLock();
-        }
-      }
-    }
-    void read();
-
-    return () => {
-      canceled = true;
-      reader.releaseLock();
-    };
-  }, [messageStream]);
-
-  useEffect(() => {
-    console.log('Room mounted', roomId);
-    return () => {
-      console.log('Room unmounted', roomId);
-    };
-  }, []);
-
   return (
     <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto w-full">
       <h1 className="text-2xl font-bold text-gray-100">Room {roomId}</h1>
@@ -72,7 +20,7 @@ export function Room({ roomId }: { roomId: string }) {
         <span className="text-gray-300 font-medium mb-2">Messages:</span>
         {messages.map((m, i) => (
           <div key={i} className="bg-gray-700 p-3 rounded-md text-gray-200">
-            {m}
+            {m.content}
           </div>
         ))}
       </div>
