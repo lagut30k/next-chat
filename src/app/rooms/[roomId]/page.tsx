@@ -17,11 +17,9 @@ export default async function RoomPage({
   // const { roomId } = useParams<{ roomId: string }>() ?? { roomId: '1' };
   const t = delay(1000).then(() => roomId);
   return (
-    <div>
-      <Suspense key={roomId} fallback="Loading... (room page)">
-        <Room roomId={roomId} />
-        <WakeLock />
-      </Suspense>
-    </div>
+    <Suspense key={roomId} fallback="Loading... (room page)">
+      <Room roomId={roomId} />
+      <WakeLock />
+    </Suspense>
   );
 }

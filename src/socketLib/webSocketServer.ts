@@ -3,7 +3,11 @@ import { sharedState } from '@/socketLib/sharedState';
 import * as http from 'node:http';
 import { clearInterval } from 'node:timers';
 import { generateUuid } from '@/utils/generateUuid';
-import { ChatMessage, ChatMessageJsonCodec } from '@/dto/ChatMessage';
+import {
+  ChatMessage,
+  ChatMessageJsonCodec,
+  ClientToServerChatMessageJsonCodec,
+} from '@/dto/ChatMessage';
 
 const wss = new WebSocketServer({ noServer: true });
 const connectedSockets = new Map<string, Set<WebSocket>>();
@@ -56,16 +60,29 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
   sendChatServerMessage('4Hello, client!');
   sendChatServerMessage('5Hello, client!');
 
-  // ws.send(JSON.stringify(sharedState.seed), { binary: false });
-
   ws.on('message', (message: Buffer, isBinary: boolean) => {
     console.log(`Message received: ${message}`);
+    if (isBinary) {
+      return;
+    }
+    const incomingMessageParseResult =
+      ClientToServerChatMessageJsonCodec.safeParse(message.toString());
+    if (!incomingMessageParseResult.success) {
+      return;
+    }
+    const incomingMessage = incomingMessageParseResult.data;
+    const chatMessage: ChatMessage = {
+      id: generateUuid(),
+      content: incomingMessage.content,
+      author: 'Client',
+    };
+    const serialisedChatMessage = ChatMessageJsonCodec.encode(chatMessage);
     getSockets(path).forEach((client) => {
       if (
         client.readyState === WebSocket.OPEN &&
         message.toString() !== `{"event":"ping"}`
       ) {
-        client.send(message, { binary: isBinary });
+        client.send(serialisedChatMessage);
       }
     });
   });

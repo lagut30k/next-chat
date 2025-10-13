@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AsyncQueue } from '@/utils/asyncQueue';
 import { useStreamToEventBus } from '@/hooks/useStreamToEventBus';
 import { generateUuid } from '@/utils/generateUuid';
-import { ChatMessage, ChatMessageJsonCodec } from '@/dto/ChatMessage';
+import {
+  ChatMessage,
+  ChatMessageJsonCodec,
+  ClientToServerChatMessage,
+  ClientToServerChatMessageJsonCodec,
+} from '@/dto/ChatMessage';
 
 let j = 1;
 
@@ -74,8 +79,9 @@ export function useSocket(url: string) {
     };
   }, [transformStream]);
 
-  const sendMessage = useCallback((message: string) => {
-    wsRef.current?.send(message);
+  const sendMessage = useCallback((message: ClientToServerChatMessage) => {
+    const serialised = ClientToServerChatMessageJsonCodec.encode(message);
+    wsRef.current?.send(serialised);
   }, []);
 
   return {
