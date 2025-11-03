@@ -4,14 +4,14 @@ import { generateUuid } from '@/utils/generateUuid';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export interface UserIdStore {
-  userId: string;
+  userId: string | undefined;
   setUser: (userId: string) => void;
 }
 
 export const useUserIdStore = create<UserIdStore>()(
   persist(
     (set) => ({
-      userId: 'aa',
+      userId: undefined,
       setUser: (userId) => set({ userId }),
     }),
     {

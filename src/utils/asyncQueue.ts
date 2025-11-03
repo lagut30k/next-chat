@@ -1,54 +1,70 @@
-import { PromiseWithResolvers } from '@/utils/promiseWithResolvers';
+import { promiseFromAbortSignal } from '@/utils/promiseFromAbortSignal';
 
 type Initializer<T> = T | (() => T);
 type AsyncInitializer<T> = Initializer<T | Promise<T>>;
 
-const finishSignal = Symbol('finish signal');
-type FinishSignal = typeof finishSignal;
-
 export class AsyncQueue<T> {
-  private queue: (Promise<T | FinishSignal> | T | FinishSignal)[] = [];
-  private queueStarted = new PromiseWithResolvers<void>();
+  private queue: (Promise<T> | T)[] = [];
+  private queueStarted = Promise.withResolvers<void>();
   private stopped = false;
+  readonly debug: Record<string, unknown> = {};
 
-  enqueueInternal(taskOrFunc: AsyncInitializer<T | FinishSignal>) {
+  enqueue(taskOrFunc: AsyncInitializer<T>) {
     if (this.stopped) {
       return;
     }
-    if (this.queue.length === 0) {
-      this.queueStarted.resolve();
-      this.queueStarted = new PromiseWithResolvers<void>();
-    }
     const task = taskOrFunc instanceof Function ? taskOrFunc() : taskOrFunc;
     this.queue.push(task);
-  }
-
-  private async dequeueInternal(): Promise<T | FinishSignal> {
-    if (this.queue.length === 0) {
-      await this.queueStarted.promise;
-    }
-    return this.queue.shift()!;
-  }
-
-  enqueue(taskOrFunc: AsyncInitializer<T>) {
-    return this.enqueueInternal(taskOrFunc);
+    this.queueStarted.resolve();
   }
 
   stop() {
-    this.enqueueInternal(finishSignal);
     this.stopped = true;
+    this.queueStarted.resolve();
+  }
+
+  get finished() {
+    return this.queue.length === 0 && this.stopped;
+  }
+
+  tryDequeue() {
+    if (this.stopped) return { success: false, value: undefined };
+    if (this.queue.length === 0) return { success: false, value: undefined };
+    const item = this.queue.shift();
+
+    if (this.queue.length === 0) {
+      // Most likely we don't have to resolve the previous promise here (expected to be already resolved), but it's safer to resolve it anyway
+      this.queueStarted.resolve();
+      this.queueStarted = Promise.withResolvers<void>();
+    }
+
+    return { success: true, value: item };
   }
 
   async *[Symbol.asyncIterator]() {
+    try {
+      while (true) {
+        if (this.stopped && this.queue.length === 0) {
+          break;
+        }
+        const { success, value } = this.tryDequeue();
+        if (success) yield value;
+        await this.queueStarted.promise;
+      }
+    } catch (e) {
+      console.log('[iterator] error in queue iteration', e);
+    }
+  }
+
+  async *abortableIterator(signal: AbortSignal) {
+    const abortPromise = promiseFromAbortSignal(signal);
     while (true) {
+      await Promise.race([this.queueStarted.promise, abortPromise]);
       if (this.stopped && this.queue.length === 0) {
         break;
       }
-      const task = await this.dequeueInternal();
-      if (task === finishSignal) {
-        break;
-      }
-      yield task;
+      const { success, value } = this.tryDequeue();
+      if (success) yield value;
     }
   }
 }

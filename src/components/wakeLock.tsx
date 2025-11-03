@@ -5,7 +5,6 @@ export const WakeLock = () => {
   useEffect(() => {
     let captured = false;
     const lock = navigator.wakeLock.request('screen');
-    console.log('aaaa');
     lock
       .then((l) => {
         console.debug('WakeLock acquired');

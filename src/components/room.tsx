@@ -1,10 +1,10 @@
 'use client';
-import { useRoomChatMessages } from '@/hooks/useSocket';
 import { useCallback, useEffect, useRef } from 'react';
 import { ChatMessage } from '@/dto/ChatMessage';
 import { useUserIdStore } from '@/store/user';
 import useStore from '@/store/useStore';
 import { generateUuid } from '@/utils/generateUuid';
+import { useRoomChatMessages } from '@/hooks/useRoomChatMessages';
 
 export function MessageView({ message }: { message: ChatMessage }) {
   const userId = useStore(useUserIdStore, (state) => state.userId);
