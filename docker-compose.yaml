@@ -1,0 +1,38 @@
+version: '3.8'
+name: chat
+
+x-defaults:
+  &defaults
+  init: true
+  tty: true
+  networks:
+    - chat_network
+
+services:
+
+  web:
+    <<: *defaults
+    depends_on: []
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+#      - WATCHPACK_POLLING=true
+#      - CHOKIDAR_USEPOLLING=true
+#      - CHOKIDAR_INTERVAL=100
+    build:
+      args:
+        APP: web
+        START_COMMAND: dev
+      context: .
+      dockerfile: ./dockerfiles/dev.Dockerfile
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+#      - ./apps/web:/app/apps/web
+#      - /app/apps/web/node_modules
+#      - /app/apps/web/.next
+
+####################################################################
+
+networks:
+  chat_network:
