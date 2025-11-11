@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AsyncQueue } from '@/utils/asyncQueue';
-import { UserAuthenticationDataJsonCodec } from '@/dto/ChatMessage';
+import { AsyncQueue } from '@chat-next/utils/asyncQueue';
+import { UserAuthenticationDataJsonCodec } from '@chat-next/dto/ChatMessage';
 
 export function wsMessageToStringQueue(queue: AsyncQueue<string>) {
   return function (event: WebSocketEventMap['message']) {

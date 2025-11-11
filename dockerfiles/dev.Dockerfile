@@ -31,7 +31,9 @@ COPY --from=pruned /app/out/package-lock.json /app/package-lock.json
 COPY apps/${APP}/package.json /app/apps/${APP}/package.json
 
 # TODO: figure out how to use npm cache
-RUN npm ci
+RUN \
+    --mount=type=cache,target=~/.npm,sharing=locked \
+    npm ci
 # see https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/reference.md#run---mounttypecache
 #RUN \
 #      --mount=type=cache,target=/usr/local/share/.cache/yarn/v6,sharing=locked \
@@ -43,10 +45,11 @@ COPY turbo.json turbo.json
 # For example: `--filter=frontend^...` means all of frontend's dependencies will be built, but not the frontend app itself (which we don't need to do for dev environment)
 RUN turbo run build --no-cache --filter=${APP}^...
 
-# TODO: figure out how to use npm cache
 # ?????
 # re-running yarn ensures that dependencies between workspaces are linked correctly
-RUN npm ci
+RUN \
+    --mount=type=cache,target=~/.npm,sharing=locked \
+    npm ci
 #RUN \
 #      --mount=type=cache,target=/usr/local/share/.cache/yarn/v6,sharing=locked \
 #      yarn --prefer-offline --frozen-lockfile
@@ -61,5 +64,5 @@ ENV START_COMMAND ${START_COMMAND}
 
 COPY --from=installer /app .
 
-CMD turbo run ${START_COMMAND} --filter=${APP}
+CMD turbo run ${START_COMMAND} --filter=${APP}...
 #CMD npm run ${START_COMMAND} -w ${APP}

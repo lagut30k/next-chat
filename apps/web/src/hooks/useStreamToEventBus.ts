@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { EventBus } from '@/utils/eventBus';
+import { EventBus } from '@chat-next/utils/eventBus';
 
 export function useStreamToEventBus<T>(stream: ReadableStream<T>) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- It's expected to update the eventBus on stream changes

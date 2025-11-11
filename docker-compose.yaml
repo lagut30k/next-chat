@@ -13,8 +13,6 @@ services:
   web:
     <<: *defaults
     depends_on: []
-    ports:
-      - "3000:3000"
     environment:
       - PORT=3000
 #      - WATCHPACK_POLLING=true
@@ -28,9 +26,40 @@ services:
       dockerfile: ./dockerfiles/dev.Dockerfile
     volumes:
       - ./apps/web/src:/app/apps/web/src
+      - ./packages/dto/src:/app/packages/dto/src
+      - ./packages/utils/src:/app/packages/utils/src
 #      - ./apps/web:/app/apps/web
 #      - /app/apps/web/node_modules
 #      - /app/apps/web/.next
+
+  realtime:
+    <<: *defaults
+    depends_on: []
+    environment:
+      - PORT=3000
+    build:
+      args:
+        APP: realtime
+        START_COMMAND: dev
+      context: .
+      dockerfile: ./dockerfiles/dev.Dockerfile
+    volumes:
+      - ./apps/realtime/src:/app/apps/realtime/src
+      - ./packages/dto/src:/app/packages/dto/src
+      - ./packages/utils/src:/app/packages/utils/src
+
+  proxy:
+    <<: *defaults
+    ports:
+      - "3000:80"
+    environment:
+      - NGINX_PORT=80
+#      - NGINX_ENVSUBST_TEMPLATE_SUFFIX=.conf
+      - NGINX_ENTRYPOINT_LOCAL_RESOLVERS=true
+    build:
+      context: .
+      dockerfile: ./dockerfiles/nginx.Dockerfile
+
 
 ####################################################################
 

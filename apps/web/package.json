@@ -4,37 +4,29 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "dev:sockets": "nodemon",
-    "build": "next build && tsc --project tsconfig.server.json && tsc-alias -p tsconfig.server.json",
-    "start": "cross-env NODE_ENV=production node dist/server.js",
+    "build": "next build",
+    "start": "next start",
     "check-types": "tsc --noEmit",
-    "lint": "eslint"
+    "lint": "eslint ."
   },
   "dependencies": {
+    "@chat-next/dto": "^0.0.0",
+    "@chat-next/utils": "^0.0.0",
     "cross-env": "^10.0.0",
     "next": "^16.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tsconfig-paths": "^4.2.0",
-    "ws": "^8.18.3",
     "zod": "^4.1.12",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
+    "@chat-next/eslint-config": "*",
+    "@chat-next/typescript-config": "*",
     "@tailwindcss/postcss": "^4.1.16",
     "@types/node": "^20",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
-    "@types/ws": "^8.18.1",
-    "eslint": "^9",
-    "eslint-config-next": "15.5.3",
-    "eslint-config-prettier": "^10.1.8",
-    "nodemon": "^3.1.10",
-    "prettier": "^3.6.2",
     "tailwindcss": "^4.1.16",
-    "ts-node": "^10.9.2",
-    "tsc-alias": "^1.8.16",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   }
 }

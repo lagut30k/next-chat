@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AsyncQueue } from '@/utils/asyncQueue';
-import {
-  ClientToServerChatMessage,
-  ClientToServerChatMessageJsonCodec,
-  UserAuthenticationDataJsonCodec,
-} from '@/dto/ChatMessage';
+import { AsyncQueue } from '@chat-next/utils/asyncQueue';
+import { UserAuthenticationDataJsonCodec } from '@chat-next/dto/ChatMessage';
 import { clearTimeout } from 'node:timers';
 
 export function wsMessageToStringQueue(queue: AsyncQueue<string>) {

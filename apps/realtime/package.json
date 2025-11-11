@@ -1,0 +1,26 @@
+{
+  "name": "realtime",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx --watch src/index.ts",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chat-next/dto": "*",
+    "@chat-next/utils": "*",
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@chat-next/eslint-config": "*",
+    "@chat-next/typescript-config": "*",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

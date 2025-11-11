@@ -1,6 +1,6 @@
 // 'use client';
 import { Suspense } from 'react';
-import { delay } from '@/utils/delay';
+import { delay } from '@chat-next/utils/delay';
 
 import { Room } from '@/components/room';
 import { WakeLock } from '@/components/wakeLock';

@@ -1,4 +1,4 @@
-import { promiseFromAbortSignal } from '@/utils/promiseFromAbortSignal';
+import { promiseFromAbortSignal } from '@chat-next/utils/promiseFromAbortSignal';
 
 type Initializer<T> = T | (() => T);
 type AsyncInitializer<T> = Initializer<T | Promise<T>>;

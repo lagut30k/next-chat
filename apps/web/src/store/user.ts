@@ -1,6 +1,6 @@
 'use client';
 import { create } from 'zustand';
-import { generateUuid } from '@/utils/generateUuid';
+import { generateUuid } from '@chat-next/utils/generateUuid';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export interface UserIdStore {

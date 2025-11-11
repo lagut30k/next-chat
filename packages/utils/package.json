@@ -1,0 +1,21 @@
+{
+  "name": "@chat-next/utils",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "devDependencies": {
+    "@chat-next/eslint-config": "*",
+    "@chat-next/typescript-config": "*",
+    "typescript": "^5.9.3"
+  }
+}

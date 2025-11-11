@@ -1,0 +1,7 @@
+{
+  "extends": "@chat-next/typescript-config/nodejs-server.json",
+  "compilerOptions": {
+    "baseUrl": "./src",
+    "outDir": "./dist"
+  }
+}

@@ -8,8 +8,8 @@ const nextConfig: NextConfig = {
   },
   webpack: (config) => {
     config.watchOptions = {
-      poll: 100,
-      aggregateTimeout: 300,
+      poll: 1000,
+      aggregateTimeout: 3000,
     };
     return config;
   },

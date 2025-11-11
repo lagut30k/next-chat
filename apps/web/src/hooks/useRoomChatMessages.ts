@@ -6,7 +6,7 @@ import {
   ChatMessageJsonCodec,
   ClientToServerChatMessage,
   ClientToServerChatMessageJsonCodec,
-} from '@/dto/ChatMessage';
+} from '@chat-next/dto/ChatMessage';
 import { useSocketAsQueue } from '@/hooks/useSocketAsQueue';
 
 export function useRoomChatMessages(roomId: string) {
@@ -15,7 +15,7 @@ export function useRoomChatMessages(roomId: string) {
     if (typeof window === 'undefined') return '';
     const host = window.location.host;
     const isSecure = window.location.protocol === 'https:';
-    return `${isSecure ? 'wss' : 'ws'}://${host}/ws/rooms/${roomId}`;
+    return `${isSecure ? 'wss' : 'ws'}://${host}/realtime/rooms/${roomId}`;
   }, [roomId]);
   const { sendMessage: sendRawMessage, messageQueue } = useSocketAsQueue(
     url,
