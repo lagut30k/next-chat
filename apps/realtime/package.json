@@ -5,13 +5,14 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx --watch src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "lint": "eslint .",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@chat-next/dto": "*",
     "@chat-next/utils": "*",
+    "mqtt": "^5.14.1",
     "ws": "^8.18.3",
     "zod": "^4.1.12"
   },

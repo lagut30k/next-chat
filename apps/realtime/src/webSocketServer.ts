@@ -9,6 +9,13 @@ import {
   UserAuthenticationDataJsonCodec,
   UserPublicData,
 } from '@chat-next/dto/ChatMessage';
+import {
+  publishToRoom,
+  subscribeToRoom,
+  unsubscribeFromRoom,
+} from './mqttBridge.js';
+import { z } from 'zod';
+import { roomIdFormat } from './formats/index.js';
 
 type Authenticated = {
   isAuthenticated: true;
@@ -25,9 +32,45 @@ type WebSocket = WsWebSocket & {
 const wss = new WebSocketServer({ noServer: true });
 const connectedSockets = new Map<string, Set<WebSocket>>();
 
+const roomPathPrefix = '/realtime/rooms/';
+const pathFormat = z.templateLiteral([roomPathPrefix, roomIdFormat]);
+
+function pathToRoom(path: string) {
+  const pathValidationResult = pathFormat.safeParse(path);
+  if (!pathValidationResult.success) {
+    throw new Error(`Invalid room path: ${path}`);
+  }
+  const room = pathValidationResult.data.substring(roomPathPrefix.length);
+  return room;
+}
+
 function addSocket(path: string, ws: WebSocket) {
   if (!connectedSockets.has(path)) {
     connectedSockets.set(path, new Set<WebSocket>());
+    const room = pathToRoom(path);
+    // TODO: handle async
+    void subscribeToRoom(room, (message) => {
+      console.log('message received', message);
+      const messageParseResult = ChatMessageJsonCodec.safeParse(
+        message.toString(),
+      );
+      if (!messageParseResult.success) {
+        console.error('Invalid message:', messageParseResult.error);
+        return;
+      }
+      const messageData = messageParseResult.data;
+      const serialisedMessage = ChatMessageJsonCodec.encode(messageData);
+      const activeClients = connectedSockets.get(path);
+      if (!activeClients) {
+        return;
+      }
+      for (const activeClient of activeClients) {
+        if (!activeClient.authentication.isAuthenticated) {
+          continue;
+        }
+        activeClient.send(serialisedMessage);
+      }
+    });
   }
   connectedSockets.get(path)?.add(ws);
 }
@@ -40,6 +83,8 @@ function removeSocket(path: string, ws: WebSocket) {
   pathSockets.delete(ws);
   if (pathSockets.size === 0) {
     connectedSockets.delete(path);
+    const room = pathToRoom(path);
+    void unsubscribeFromRoom(room);
   }
 }
 
@@ -94,6 +139,8 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
     };
 
     const serialisedChatMessage = ChatMessageJsonCodec.encode(chatMessage);
+    const room = pathToRoom(path);
+    void publishToRoom(room, serialisedChatMessage);
     getSockets(path).forEach((client) => {
       if (
         client.readyState === WebSocket.OPEN &&

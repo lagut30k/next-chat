@@ -37,6 +37,8 @@ services:
     depends_on: []
     environment:
       - PORT=3000
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
     build:
       args:
         APP: realtime
@@ -60,6 +62,9 @@ services:
       context: .
       dockerfile: ./dockerfiles/nginx.Dockerfile
 
+  mqtt:
+    <<: *defaults
+    image: emqx/nanomq
 
 ####################################################################
 

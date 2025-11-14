@@ -3,5 +3,10 @@
   "compilerOptions": {
     "baseUrl": "./src",
     "outDir": "./dist"
+  },
+  "watchOptions": {
+    "watchFile": "FixedPollingInterval",
+    "watchDirectory": "FixedPollingInterval",
+    "fallbackPolling": "DynamicPriority"
   }
 }

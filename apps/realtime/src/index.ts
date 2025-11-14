@@ -12,7 +12,6 @@ server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
     wss.emit('connection', ws, req);
   });
 });
-//
 
 console.log(
   `> Server listening at http://localhost:${port} as ${
