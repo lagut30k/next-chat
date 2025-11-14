@@ -22,11 +22,7 @@ WORKDIR /app
 ARG APP
 
 COPY --from=pruned /app/out/json/ .
-COPY --from=pruned /app/out/package-lock.json /app/package-lock.json
 
-#COPY apps/${APP}/package.json /app/apps/${APP}/package.json
-
-# TODO: figure out how to use npm cache
 RUN \
     --mount=type=cache,target=~/.npm,sharing=locked \
     npm ci
@@ -34,14 +30,15 @@ RUN \
 COPY --from=pruned /app/out/full/ .
 COPY turbo.json turbo.json
 
+# TODO: Most likely the following build and relink is not required at all, or at least in dev scenario, but keeping it here for some time
 # For example: `--filter=frontend^...` means all of frontend's dependencies will be built, but not the frontend app itself (which we don't need to do for dev environment)
-RUN turbo run build --no-cache --filter=${APP}^...
+#RUN turbo run build --no-cache --filter=${APP}^...
 
 # ?????
 # re-running yarn ensures that dependencies between workspaces are linked correctly
-RUN \
-    --mount=type=cache,target=~/.npm,sharing=locked \
-    npm ci
+#RUN \
+#    --mount=type=cache,target=~/.npm,sharing=locked \
+#    npm ci
 
 #############################################
 FROM base AS runner
