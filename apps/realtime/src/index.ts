@@ -8,6 +8,7 @@ const dev = process.env.NODE_ENV !== 'production';
 const server = createServer().listen(port);
 
 server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+  console.log('upgrade headers', req.headers);
   wss.handleUpgrade(req, socket, head, (ws) => {
     wss.emit('connection', ws, req);
   });

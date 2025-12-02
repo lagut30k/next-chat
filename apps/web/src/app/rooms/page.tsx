@@ -1,10 +1,8 @@
 'use client';
-import { seed } from '@/socketLib/testIsolation';
 import { Room } from '@/components/room';
 import { useState } from 'react';
 
 export default function LobbyPage() {
-  const t = seed;
   const [roomId, setRoomId] = useState('1');
   return (
     <div className="flex flex-col min-w-0 p-4">

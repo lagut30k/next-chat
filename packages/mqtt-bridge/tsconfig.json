@@ -1,0 +1,14 @@
+{
+  "extends": "@chat-next/typescript-config/base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "watchOptions": {
+    "watchFile": "FixedPollingInterval",
+    "watchDirectory": "FixedPollingInterval",
+    "fallbackPolling": "DynamicPriority"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

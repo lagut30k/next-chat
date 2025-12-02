@@ -1,5 +1,5 @@
 {
-  "name": "@chat-next/dto",
+  "name": "@chat-next/mqtt-bridge",
   "type": "module",
   "version": "0.0.0",
   "scripts": {
@@ -20,6 +20,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@chat-next/dto": "*",
     "zod": "^4.1.12"
   }
 }

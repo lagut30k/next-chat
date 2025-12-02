@@ -6,11 +6,12 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch --clear-screen=false --include 'src' --include '../../node_modules/@chat-next' src/index.ts",
-    "lint": "eslint .",
+    "lint": "eslint ./src",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@chat-next/dto": "*",
+    "@chat-next/mqtt-bridge": "*",
     "@chat-next/utils": "*",
     "mqtt": "^5.14.1",
     "ws": "^8.18.3",

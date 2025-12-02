@@ -1,9 +1,10 @@
-FROM node:24.11.0-alpine3.22 as base
+FROM node:24.11.0-alpine3.22 AS base
 
-RUN apk add -f --update --no-cache --virtual .gyp nano bash libc6-compat python3 make g++
 RUN apk update
-RUN apk add --no-cache libc6-compat
+RUN apk add -f --update --no-cache --virtual .gyp nano bash libc6-compat python3 make g++
+#RUN apk add --no-cache libc6-compat
 RUN npm i --global turbo@^2
+RUN corepack enable
 
 WORKDIR /app
 #############################################

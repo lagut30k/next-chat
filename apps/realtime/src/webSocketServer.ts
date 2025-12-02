@@ -3,24 +3,26 @@ import * as http from 'node:http';
 import { clearInterval } from 'node:timers';
 import { generateUuid } from '@chat-next/utils/generateUuid';
 import {
-  ChatMessage,
-  ChatMessageJsonCodec,
-  ClientToServerChatMessageJsonCodec,
-  UserAuthenticationDataJsonCodec,
-  UserPublicData,
-} from '@chat-next/dto/ChatMessage';
-import {
-  publishToRoom,
+  publishSerialisedToRoom,
   subscribeToRoom,
   unsubscribeFromRoom,
-} from './mqttBridge.js';
+} from '@chat-next/mqtt-bridge/mqttBridge';
 import { z } from 'zod';
-import { roomIdFormat } from './formats/index.js';
+import { roomIdFormat } from '@chat-next/mqtt-bridge/formats/index';
+import {
+  ChatMessagePayload,
+  UserPublicData,
+} from '@chat-next/dto/serverToClient/chat/ServerToClientChatMessagePayload';
+import { UserAuthenticationPayload } from '@chat-next/dto/clientToServer/service/UserAuthenticationMessage';
+import { ServerToClientJsonCodec } from '@chat-next/dto/serverToClient/ServerToClientMessage';
+import { ClientToServerJsonCodec } from '@chat-next/dto/clientToServer/ClientToServerMessage';
+import { ChatMessageContent } from '@chat-next/dto/shared/chat/ChatMessageContent';
 
 type Authenticated = {
   isAuthenticated: true;
   user: UserPublicData;
 };
+
 type NonAuthenticated = {
   isAuthenticated: false;
 };
@@ -50,8 +52,8 @@ function addSocket(path: string, ws: WebSocket) {
     const room = pathToRoom(path);
     // TODO: handle async
     void subscribeToRoom(room, (message) => {
-      console.log('message received', message);
-      const messageParseResult = ChatMessageJsonCodec.safeParse(
+      console.log('MQTT message received', message);
+      const messageParseResult = ServerToClientJsonCodec.safeParse(
         message.toString(),
       );
       if (!messageParseResult.success) {
@@ -59,16 +61,26 @@ function addSocket(path: string, ws: WebSocket) {
         return;
       }
       const messageData = messageParseResult.data;
-      const serialisedMessage = ChatMessageJsonCodec.encode(messageData);
-      const activeClients = connectedSockets.get(path);
-      if (!activeClients) {
-        return;
-      }
-      for (const activeClient of activeClients) {
-        if (!activeClient.authentication.isAuthenticated) {
-          continue;
+      switch (messageData.type) {
+        case 'chat': {
+          const activeClients = connectedSockets.get(path);
+          if (!activeClients) {
+            return;
+          }
+          const serialisedMessage = ServerToClientJsonCodec.encode(messageData);
+          for (const activeClient of activeClients) {
+            if (!activeClient.authentication.isAuthenticated) {
+              continue;
+            }
+            activeClient.send(serialisedMessage);
+          }
+          break;
         }
-        activeClient.send(serialisedMessage);
+        case 'service':
+          console.warn(
+            'Unexpected service message received through MQTT multicast',
+            messageData.payload,
+          );
       }
     });
   }
@@ -92,8 +104,6 @@ function getSockets(path: string) {
   return connectedSockets.get(path) ?? new Set<WebSocket>();
 }
 
-const serverId = generateUuid();
-
 wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
   ws.authentication = {
     isAuthenticated: false,
@@ -106,60 +116,54 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
   console.log('path:', path);
   addSocket(path, ws);
 
-  function sendChatMessage(message: ChatMessage) {
-    ws.send(ChatMessageJsonCodec.encode(message));
+  function sendChatMessage(message: ChatMessagePayload) {
+    const serverToClientMessage = { type: 'chat' as const, payload: message };
+    ws.send(ServerToClientJsonCodec.encode(serverToClientMessage));
   }
   function sendChatServerMessage(message: string) {
     return sendChatMessage({
       id: generateUuid(),
-      content: message,
+      content: {
+        type: 'text',
+        text: message,
+      },
       author: {
-        id: serverId,
-        nickName: 'Server',
+        type: 'system',
       },
     });
   }
   const pingInterval = setInterval(() => ws.ping(), 10_000);
   sendChatServerMessage('Hello! Please authenticate');
 
-  function broadcastMessage(
-    message: Buffer<ArrayBufferLike>,
+  function forwardChatMessageToMessageQueue(
+    messageContent: ChatMessageContent,
     user: UserPublicData,
   ) {
-    const incomingMessageParseResult =
-      ClientToServerChatMessageJsonCodec.safeParse(message.toString());
-    if (!incomingMessageParseResult.success) {
-      return;
-    }
-    const incomingMessage = incomingMessageParseResult.data;
-    const chatMessage: ChatMessage = {
+    const chatMessage: ChatMessagePayload = {
       id: generateUuid(),
-      content: incomingMessage.content,
-      author: user,
+      content: messageContent,
+      author: {
+        type: 'user',
+        user: user,
+      },
+    };
+    const serverToClientMessage = {
+      type: 'chat' as const,
+      payload: chatMessage,
     };
 
-    const serialisedChatMessage = ChatMessageJsonCodec.encode(chatMessage);
+    const serialisedChatMessage = ServerToClientJsonCodec.encode(
+      serverToClientMessage,
+    );
     const room = pathToRoom(path);
-    void publishToRoom(room, serialisedChatMessage);
-    getSockets(path).forEach((client) => {
-      if (
-        client.readyState === WebSocket.OPEN &&
-        message.toString() !== `{"event":"ping"}` &&
-        client.authentication.isAuthenticated
-      ) {
-        client.send(serialisedChatMessage);
-      }
-    });
+    void publishSerialisedToRoom(room, serialisedChatMessage);
   }
 
-  function authenticate(message: Buffer, ws: WebSocket) {
-    const parseResult = UserAuthenticationDataJsonCodec.safeParse(
-      message.toString(),
-    );
-    if (!parseResult.success) {
-      return;
-    }
-    const userData = parseResult.data;
+  function authenticate(
+    userAuthenticationPayload: UserAuthenticationPayload,
+    ws: WebSocket,
+  ) {
+    const userData = userAuthenticationPayload.data;
     ws.authentication = {
       isAuthenticated: true,
       user: {
@@ -173,14 +177,61 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
   }
 
   ws.on('message', (message: Buffer, isBinary: boolean) => {
-    console.log(`Message received: ${message}`);
+    console.log(`WebSocket message received: ${message}`);
     if (isBinary) {
       return;
     }
+    const incomingMessageParseResult = ClientToServerJsonCodec.safeParse(
+      message.toString(),
+    );
+    if (!incomingMessageParseResult.success) {
+      console.warn(
+        'Received unparsable message',
+        incomingMessageParseResult.error,
+      );
+      return;
+    }
+    const payload = incomingMessageParseResult.data;
+    if (ws.authentication.isAuthenticated) {
+      switch (payload.type) {
+        case 'chat': {
+          const messageContent = payload.payload;
+          forwardChatMessageToMessageQueue(
+            messageContent,
+            ws.authentication.user,
+          );
+          break;
+        }
+        case 'service':
+          break;
+      }
+    }
+
     if (!ws.authentication.isAuthenticated) {
-      authenticate(message, ws);
-    } else {
-      broadcastMessage(message, ws.authentication.user);
+      switch (payload.type) {
+        case 'chat':
+          console.error(
+            'Attempt to send chat message from non-authenticated ws connection',
+            {
+              payload,
+            },
+          );
+          break;
+        case 'service':
+          const serviceMessagePayload = payload.payload;
+          if (serviceMessagePayload.type !== 'user-authentication') {
+            console.error(
+              'Attempt to send service message from non-authenticated ws connection',
+              {
+                payload,
+                ws,
+              },
+            );
+            return;
+          }
+          authenticate(serviceMessagePayload, ws);
+          break;
+      }
     }
   });
 

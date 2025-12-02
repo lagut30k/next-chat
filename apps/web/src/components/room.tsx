@@ -1,36 +1,48 @@
 'use client';
 import { useCallback, useEffect, useRef } from 'react';
-import { ChatMessage } from '@chat-next/dto/ChatMessage';
 import { useUserIdStore } from '@/store/user';
 import useStore from '@/store/useStore';
 import { generateUuid } from '@chat-next/utils/generateUuid';
 import { useRoomChatMessages } from '@/hooks/useRoomChatMessages';
+import { ChatMessagePayload } from '@chat-next/dto/serverToClient/chat/ServerToClientChatMessagePayload';
+import clsx from 'clsx';
+import { submitTextMessage } from '@/actions/submitTextMessage';
 
-export function MessageView({ message }: { message: ChatMessage }) {
+export function MessageView({ message }: { message: ChatMessagePayload }) {
   const userId = useStore(useUserIdStore, (state) => state.userId);
-  const isMe = message.author.id === userId;
+  const author = message.author;
+  const isMe = author.type === 'user' && author.user.id === userId;
+  const nickName = author.type === 'user' ? author.user.nickName : 'System';
   return (
     <div
-      className={` p-3 rounded-md ${isMe ? 'text-blue-200 bg-blue-700' : 'text-gray-200 bg-gray-700'}`}
+      className={clsx(
+        `p-3 rounded-md`,
+        isMe && 'text-blue-200 bg-blue-700',
+        !isMe && 'text-gray-200 bg-gray-700',
+        author.type === 'system' && 'opacity-40',
+      )}
     >
-      <div className="text-xs text-gray-400 ">{message.author.nickName}</div>
-      <div className="text-gray-200">{message.content}</div>
+      <div className="text-xs text-gray-400 ">{nickName}</div>
+      <div className="text-gray-200">{message.content.text}</div>
     </div>
   );
 }
 
 export function Room({ roomId }: { roomId: string }) {
   const { sendMessage, messages } = useRoomChatMessages(roomId);
+  const sendTextMessage = submitTextMessage.bind(null, roomId);
 
   const submit = useCallback(
     (formData: FormData) => {
       const text = formData.get('text') as string;
       sendMessage({
-        content: text,
+        type: 'text',
+        text: text,
       });
     },
     [sendMessage],
   );
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     messagesContainerRef.current?.scroll({
@@ -67,7 +79,7 @@ export function Room({ roomId }: { roomId: string }) {
           ))}
         </div>
       </div>
-      <form action={submit} className="flex gap-2" autoComplete="off">
+      <form action={sendTextMessage} className="flex gap-2" autoComplete="off">
         <input
           name="text"
           autoFocus

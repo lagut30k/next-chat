@@ -2,11 +2,14 @@ import mqtt from 'mqtt';
 import appSettings from './appSettings.js';
 import { z } from 'zod';
 import { roomIdFormat } from './formats/index.js';
+import {
+  ServerToClientJsonCodec,
+  ServerToClientMessage,
+} from '@chat-next/dto/serverToClient/ServerToClientMessage';
 
 const mqttClient = await mqtt.connectAsync(appSettings.mqttBrokerUrl);
 
 mqttClient.on('connect', () => {
-  console.log('MQTT client connected');
   console.log('MQTT client connected');
 });
 
@@ -24,7 +27,7 @@ function topicToRoom(topic: string) {
 }
 
 mqttClient.on('message', (topic, message) => {
-  console.log(`Message received: ${message}. Topic: ${topic}`);
+  console.log(`MQTT message received: Topic: '${topic}'. ${message}.`);
   const room = topicToRoom(topic);
   if (activeRooms.has(room)) {
     activeRooms.get(room)?.(message);
@@ -60,6 +63,14 @@ export async function unsubscribeFromRoom(room: string) {
   return mqttClient.unsubscribeAsync(topic);
 }
 
-export async function publishToRoom(room: string, message: string) {
+export async function publishServerToClientMessageToRoom(
+  room: string,
+  message: ServerToClientMessage,
+) {
+  const serialisedMessage = ServerToClientJsonCodec.encode(message);
+  return publishSerialisedToRoom(room, serialisedMessage);
+}
+
+export async function publishSerialisedToRoom(room: string, message: string) {
   return mqttClient.publishAsync(roomToTopic(room), message);
 }

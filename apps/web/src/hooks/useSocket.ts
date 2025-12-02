@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AsyncQueue } from '@chat-next/utils/asyncQueue';
-import { UserAuthenticationDataJsonCodec } from '@chat-next/dto/ChatMessage';
 import { clearTimeout } from 'node:timers';
+import { ClientToServerJsonCodec } from '@chat-next/dto/clientToServer/ClientToServerMessage';
 
 export function wsMessageToStringQueue(queue: AsyncQueue<string>) {
   return function (event: WebSocketEventMap['message']) {
@@ -31,9 +31,15 @@ export function useSocket(url: string, userId?: string) {
 
     const authenticate = () => {
       console.log('Authenticating', userId, typeof userId);
-      const serialized = UserAuthenticationDataJsonCodec.encode({
-        userId: userId,
-        nickName: `User-${userId}`,
+      const serialized = ClientToServerJsonCodec.encode({
+        type: 'service',
+        payload: {
+          type: 'user-authentication',
+          data: {
+            userId: userId,
+            nickName: `User-${userId}`,
+          },
+        },
       });
       reconnectableWs.send(serialized);
     };

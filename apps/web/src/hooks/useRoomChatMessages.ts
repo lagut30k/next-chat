@@ -1,13 +1,14 @@
 import useStore from '@/store/useStore';
 import { useUserIdStore } from '@/store/user';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ChatMessage,
-  ChatMessageJsonCodec,
-  ClientToServerChatMessage,
-  ClientToServerChatMessageJsonCodec,
-} from '@chat-next/dto/ChatMessage';
 import { useSocketAsQueue } from '@/hooks/useSocketAsQueue';
+import { ChatMessagePayload } from '@chat-next/dto/serverToClient/chat/ServerToClientChatMessagePayload';
+import { ChatMessageContent } from '@chat-next/dto/shared/chat/ChatMessageContent';
+import {
+  ClientToServerJsonCodec,
+  ClientToServerMessage,
+} from '@chat-next/dto/clientToServer/ClientToServerMessage';
+import { ServerToClientJsonCodec } from '@chat-next/dto/serverToClient/ServerToClientMessage';
 
 export function useRoomChatMessages(roomId: string) {
   const userId = useStore(useUserIdStore, (state) => state.userId);
@@ -23,13 +24,17 @@ export function useRoomChatMessages(roomId: string) {
   );
   const messageQueueRef = useRef(messageQueue);
   const sendMessage = useCallback(
-    (message: ClientToServerChatMessage) => {
-      const serialised = ClientToServerChatMessageJsonCodec.encode(message);
+    (message: ChatMessageContent) => {
+      const rawMessage: ClientToServerMessage = {
+        type: 'chat',
+        payload: message,
+      };
+      const serialised = ClientToServerJsonCodec.encode(rawMessage);
       sendRawMessage(serialised);
     },
     [sendRawMessage],
   );
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessagePayload[]>([]);
   useEffect(() => {
     console.log(
       '[effect]useEffect',
@@ -43,11 +48,19 @@ export function useRoomChatMessages(roomId: string) {
       try {
         const iterator = messageQueue.abortableIterator(abortController.signal);
         for await (const message of iterator) {
-          const parseResult = ChatMessageJsonCodec.safeParse(message);
-          if (parseResult.success) {
-            setMessages((messages) => [...messages, parseResult.data]);
-          } else {
+          const parseResult = ServerToClientJsonCodec.safeParse(message);
+          if (!parseResult.success) {
             console.error('[effect]Invalid message:', parseResult.error);
+            continue;
+          }
+          const parsed = parseResult.data;
+          switch (parsed.type) {
+            case 'chat':
+              setMessages((messages) => [...messages, parsed.payload]);
+              break;
+            case 'service':
+              console.log('Received service message', parsed.payload);
+              break;
           }
         }
       } catch (e) {

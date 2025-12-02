@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "db:push": "turbo -F @chat-next/database push --ui=tui",
+    "db:studio": "turbo -F @chat-next/database studio"
   },
   "workspaces": [
     "apps/*",
