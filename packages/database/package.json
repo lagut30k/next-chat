@@ -9,7 +9,7 @@
     "check-types": "tsc --noEmit",
     "push": "NODE_OPTIONS='--import tsx' npm run with-env drizzle-kit push",
     "studio": "NODE_OPTIONS='--import tsx' npm run with-env drizzle-kit studio",
-    "with-env": "dotenvx run -f ../../.env -- "
+    "with-env": "dotenvx run -f ../../.env --"
   },
   "exports": {
     "./*": {

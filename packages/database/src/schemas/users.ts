@@ -11,6 +11,7 @@ export const usersTable = pgTable('users', {
 
 export const roomsTable = pgTable('rooms', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar({ length: 255 }).notNull(),
   slug: varchar({ length: 255 }).notNull().unique(),
   ...timestamps,
 });

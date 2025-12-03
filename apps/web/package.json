@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "npm run with-env next dev",
+    "build": "npm run with-env next build",
+    "start": "npm run with-env next start",
     "check-types": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "with-env": "dotenvx run -f ../../.env --"
   },
   "dependencies": {
     "@chat-next/database": "*",
