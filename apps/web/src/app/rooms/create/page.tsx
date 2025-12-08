@@ -44,7 +44,8 @@ export default function CreateRoomPage() {
             name="slug"
             className="w-full px-3 py-2 border rounded-md"
             defaultValue={state.slug.value}
-            pattern="[a-z0-9-]+"
+            pattern="[a-z0-9\-]+"
+            title="Only lowcase letters, numbers and dashes (-) are allowed"
             aria-describedby="slug-error"
           />
           <div id="slug-error" aria-live="polite" aria-atomic="true">

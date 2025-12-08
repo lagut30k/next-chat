@@ -2,17 +2,10 @@
 
 import { z } from 'zod';
 import { db } from '@chat-next/database/client';
-import { roomsTable } from '@chat-next/database/schema';
+import { createRoomSchema, roomsTable } from '@chat-next/database/schema';
 import { redirect } from 'next/navigation';
 
-const FormSchema = z.object({
-  name: z.string().nonempty().max(255),
-  slug: z
-    .string()
-    .nonempty()
-    .max(255)
-    .regex(/^[a-z0-9-]*$/),
-});
+const FormSchema = createRoomSchema;
 
 export type CreateRoomState = {
   name: { value: string; errors?: string[] };

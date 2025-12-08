@@ -1,5 +1,4 @@
 import { index, integer, pgEnum, pgTable, varchar } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
 import { roomsTable, usersTable } from './users.js';
 import { timestamps } from './shared.js';
 
@@ -22,12 +21,6 @@ export const messagesTable = pgTable(
   },
   (t) => [index('room_id_created_at_idx').on(t.roomId, t.createdAt)],
 );
-
-export const messagesRelations = relations(messagesTable, ({ one }) => ({
-  textMessage: one(textMessagesTable),
-  imageMessage: one(imageMessageTable),
-  markdownMessage: one(markdownMessageTable),
-}));
 
 export const textMessagesTable = pgTable('text_messages', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

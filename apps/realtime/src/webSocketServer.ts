@@ -104,142 +104,157 @@ function getSockets(path: string) {
   return connectedSockets.get(path) ?? new Set<WebSocket>();
 }
 
-wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
+function sendChatMessage(ws: WebSocket, message: ChatMessagePayload) {
+  const serverToClientMessage = { type: 'chat' as const, payload: message };
+  ws.send(ServerToClientJsonCodec.encode(serverToClientMessage));
+}
+
+function sendChatServerMessage(ws: WebSocket, message: string) {
+  return sendChatMessage(ws, {
+    id: generateUuid(),
+    content: {
+      type: 'text',
+      text: message,
+    },
+    author: {
+      type: 'system',
+    },
+  });
+}
+
+function authenticate(
+  ws: WebSocket,
+  userAuthenticationPayload: UserAuthenticationPayload,
+) {
+  const userData = userAuthenticationPayload.data;
   ws.authentication = {
-    isAuthenticated: false,
+    isAuthenticated: true,
+    user: {
+      id: userData.userId,
+      nickName: userData.nickName,
+    },
   };
-  console.log('New client connected');
-  console.log('request.url', request.url);
-  const url = URL.parse(request.url ?? '', 'http://fake.domain/');
-  const path = url?.pathname ?? '';
+  sendChatServerMessage(
+    ws,
+    `Thank you for authenticating, ${userData.nickName}!`,
+  );
+}
 
-  console.log('path:', path);
-  addSocket(path, ws);
+function forwardChatMessageToMessageQueue(
+  room: string,
+  messageContent: ChatMessageContent,
+  user: UserPublicData,
+) {
+  const chatMessage: ChatMessagePayload = {
+    id: generateUuid(),
+    content: messageContent,
+    author: {
+      type: 'user',
+      user: user,
+    },
+  };
+  const serverToClientMessage = {
+    type: 'chat' as const,
+    payload: chatMessage,
+  };
 
-  function sendChatMessage(message: ChatMessagePayload) {
-    const serverToClientMessage = { type: 'chat' as const, payload: message };
-    ws.send(ServerToClientJsonCodec.encode(serverToClientMessage));
-  }
-  function sendChatServerMessage(message: string) {
-    return sendChatMessage({
-      id: generateUuid(),
-      content: {
-        type: 'text',
-        text: message,
-      },
-      author: {
-        type: 'system',
-      },
-    });
-  }
-  const pingInterval = setInterval(() => ws.ping(), 10_000);
-  sendChatServerMessage('Hello! Please authenticate');
+  const serialisedChatMessage = ServerToClientJsonCodec.encode(
+    serverToClientMessage,
+  );
+  void publishSerialisedToRoom(room, serialisedChatMessage);
+}
 
-  function forwardChatMessageToMessageQueue(
-    messageContent: ChatMessageContent,
-    user: UserPublicData,
-  ) {
-    const chatMessage: ChatMessagePayload = {
-      id: generateUuid(),
-      content: messageContent,
-      author: {
-        type: 'user',
-        user: user,
-      },
-    };
-    const serverToClientMessage = {
-      type: 'chat' as const,
-      payload: chatMessage,
-    };
-
-    const serialisedChatMessage = ServerToClientJsonCodec.encode(
-      serverToClientMessage,
-    );
-    const room = pathToRoom(path);
-    void publishSerialisedToRoom(room, serialisedChatMessage);
-  }
-
-  function authenticate(
-    userAuthenticationPayload: UserAuthenticationPayload,
-    ws: WebSocket,
-  ) {
-    const userData = userAuthenticationPayload.data;
+wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
+  // TODO
+  try {
     ws.authentication = {
-      isAuthenticated: true,
-      user: {
-        id: userData.userId,
-        nickName: userData.nickName,
-      },
+      isAuthenticated: false,
     };
-    sendChatServerMessage(
-      `Thank you for authenticating, ${userData.nickName}!`,
-    );
-  }
+    console.log('New client connected');
+    console.log('request.url', request.url);
+    const url = URL.parse(request.url ?? '', 'http://fake.domain/');
+    const path = url?.pathname ?? '';
 
-  ws.on('message', (message: Buffer, isBinary: boolean) => {
-    console.log(`WebSocket message received: ${message}`);
-    if (isBinary) {
-      return;
-    }
-    const incomingMessageParseResult = ClientToServerJsonCodec.safeParse(
-      message.toString(),
-    );
-    if (!incomingMessageParseResult.success) {
-      console.warn(
-        'Received unparsable message',
-        incomingMessageParseResult.error,
-      );
-      return;
-    }
-    const payload = incomingMessageParseResult.data;
-    if (ws.authentication.isAuthenticated) {
-      switch (payload.type) {
-        case 'chat': {
-          const messageContent = payload.payload;
-          forwardChatMessageToMessageQueue(
-            messageContent,
-            ws.authentication.user,
-          );
-          break;
-        }
-        case 'service':
-          break;
+    console.log('path:', path);
+    addSocket(path, ws);
+    const room = pathToRoom(path);
+
+    const pingInterval = setInterval(() => ws.ping(), 10_000);
+    sendChatServerMessage(ws, 'Hello! Please authenticate');
+
+    ws.on('message', (message: Buffer, isBinary: boolean) => {
+      console.log(`WebSocket message received: ${message}`);
+      if (isBinary) {
+        return;
       }
-    }
+      const incomingMessageParseResult = ClientToServerJsonCodec.safeParse(
+        message.toString(),
+      );
+      if (!incomingMessageParseResult.success) {
+        console.warn(
+          'Received unparsable message',
+          incomingMessageParseResult.error,
+        );
+        return;
+      }
+      const payload = incomingMessageParseResult.data;
+      if (ws.authentication.isAuthenticated) {
+        switch (payload.type) {
+          case 'chat': {
+            const messageContent = payload.payload;
+            forwardChatMessageToMessageQueue(
+              room,
+              messageContent,
+              ws.authentication.user,
+            );
+            break;
+          }
+          case 'service':
+            break;
+        }
+      }
 
-    if (!ws.authentication.isAuthenticated) {
-      switch (payload.type) {
-        case 'chat':
-          console.error(
-            'Attempt to send chat message from non-authenticated ws connection',
-            {
-              payload,
-            },
-          );
-          break;
-        case 'service':
-          const serviceMessagePayload = payload.payload;
-          if (serviceMessagePayload.type !== 'user-authentication') {
+      if (!ws.authentication.isAuthenticated) {
+        switch (payload.type) {
+          case 'chat':
             console.error(
-              'Attempt to send service message from non-authenticated ws connection',
+              'Attempt to send chat message from non-authenticated ws connection',
               {
                 payload,
-                ws,
               },
             );
-            return;
+            break;
+          case 'service': {
+            const serviceMessagePayload = payload.payload;
+            if (serviceMessagePayload.type !== 'user-authentication') {
+              console.error(
+                'Attempt to send service message from non-authenticated ws connection',
+                {
+                  payload,
+                  ws,
+                },
+              );
+              return;
+            }
+            authenticate(ws, serviceMessagePayload);
+            break;
           }
-          authenticate(serviceMessagePayload, ws);
-          break;
+        }
       }
-    }
-  });
+    });
 
-  ws.on('close', (event) => {
-    removeSocket(path, ws);
-    clearInterval(pingInterval);
-    console.log('Client disconnected', event);
-  });
+    ws.on('close', (event) => {
+      removeSocket(path, ws);
+      clearInterval(pingInterval);
+      console.log('Client disconnected', event);
+    });
+  } catch (e) {
+    console.error('Error handling WebSocket connection', e);
+  }
+});
+
+wss.on('error', (error) => {
+  console.error('WebSocket server error:', error);
 });
 
 export default wss;

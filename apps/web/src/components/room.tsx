@@ -29,19 +29,8 @@ export function MessageView({ message }: { message: ChatMessagePayload }) {
 }
 
 export function Room({ roomId }: { roomId: string }) {
-  const { sendMessage, messages } = useRoomChatMessages(roomId);
+  const { messages } = useRoomChatMessages(roomId);
   const sendTextMessage = submitTextMessage.bind(null, roomId);
-
-  const submit = useCallback(
-    (formData: FormData) => {
-      const text = formData.get('text') as string;
-      sendMessage({
-        type: 'text',
-        text: text,
-      });
-    },
-    [sendMessage],
-  );
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
